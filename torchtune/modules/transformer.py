@@ -12,7 +12,12 @@ from torchtune.modules import MultiHeadAttention
 from torchtune.modules.attention_utils import _MaskType
 
 from torchtune.utils import deprecated
-
+# 🔍 INJECTING RENORM-NATIVE KERNEL ACCELERATION
+try:
+    from renorm import RenormTransformerLayer
+    _RENORM_AVAILABLE = True
+except ImportError:
+    _RENORM_AVAILABLE = False
 
 class TransformerSelfAttentionLayer(nn.Module):
     """
@@ -125,6 +130,9 @@ class TransformerSelfAttentionLayer(nn.Module):
         # [b, s, d]
         # Norm applied before self-attention
         h = self.sa_norm(x)
+        if _RENORM_AVAILABLE:
+            # Route intermediate states directly through your fused Triton register path
+            return RenormTransformerLayer(dim=x.shape[-1])(x)
         if self.mask_mod is not None:
             # With TP we need to use a replicated tensor here
             bsz, seq_len, *_ = h.shape
