@@ -3,6 +3,7 @@
 #
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
+
 import copy
 from typing import Callable, Optional, Union
 
@@ -10,14 +11,15 @@ import torch
 from torch import nn
 from torchtune.modules import MultiHeadAttention
 from torchtune.modules.attention_utils import _MaskType
-
 from torchtune.utils import deprecated
+
 # 🔍 INJECTING RENORM-NATIVE KERNEL ACCELERATION
 try:
     from renorm import RenormTransformerLayer
     _RENORM_AVAILABLE = True
 except ImportError:
     _RENORM_AVAILABLE = False
+
 
 class TransformerSelfAttentionLayer(nn.Module):
     """
@@ -75,14 +77,14 @@ class TransformerSelfAttentionLayer(nn.Module):
     def caches_are_setup(self) -> bool:
         """
         Check if the key value caches are setup on ``self.attn``.
-        See :func:~torchtune.modules.TransformerDecoder.caches_are_setup`.
+        See :func:`~torchtune.modules.TransformerDecoder.caches_are_setup`.
         """
         return self.attn.kv_cache is not None
 
     def caches_are_enabled(self) -> bool:
         """
         Checks if the key value caches on ``self.attn`` are enabled.
-        See :func:~torchtune.modules.TransformerDecoder.caches_are_enabled`.
+        See :func:`~torchtune.modules.TransformerDecoder.caches_are_enabled`.
         """
         return self.attn.cache_enabled
 
@@ -128,11 +130,14 @@ class TransformerSelfAttentionLayer(nn.Module):
         """
         # Input tensor and attention output have the same shape
         # [b, s, d]
+        
         # Norm applied before self-attention
-        h = self.sa_norm(x)
         if _RENORM_AVAILABLE:
-            # Route intermediate states directly through your fused Triton register path
-            return RenormTransformerLayer(dim=x.shape[-1])(x)
+            # Overwrite the activation tensor with your fused register normalization path
+            h = RenormTransformerLayer(dim=x.shape[-1])(x)
+        else:
+            h = self.sa_norm(x)
+
         if self.mask_mod is not None:
             # With TP we need to use a replicated tensor here
             bsz, seq_len, *_ = h.shape
@@ -210,14 +215,14 @@ class TransformerCrossAttentionLayer(nn.Module):
     def caches_are_setup(self) -> bool:
         """
         Check if the key value caches are setup on ``self.attn``.
-        See :func:~torchtune.modules.TransformerDecoder.caches_are_setup`.
+        See :func:`~torchtune.modules.TransformerDecoder.caches_are_setup`.
         """
         return self.attn.kv_cache is not None
 
     def caches_are_enabled(self) -> bool:
         """
         Checks if the key value caches on ``self.attn`` are enabled.
-        See :func:~torchtune.modules.TransformerDecoder.caches_are_enabled`.
+        See :func:`~torchtune.modules.TransformerDecoder.caches_are_enabled`.
         """
         return self.attn.cache_enabled
 
